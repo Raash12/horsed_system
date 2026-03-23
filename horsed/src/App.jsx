@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { fetchUsers, addUser, updateUser, deleteUser } from "./supabaseClient"
+import { fetchUsers, addUser, updateUser, deleteUser } from "./config/supabaseClient"
 
 export default function App() {
   const [users, setUsers] = useState([])
@@ -57,7 +57,6 @@ export default function App() {
       <div className="bg-white p-6 rounded-2xl shadow-xl w-80 text-center mb-6">
         <h1 className="text-3xl font-bold text-blue-600 mb-4">Supabase CRUD 🚀</h1>
 
-
         <input
           className="border p-2 w-full mb-2 rounded"
           placeholder="Enter name"
@@ -68,7 +67,7 @@ export default function App() {
           onClick={handleAddOrUpdateUser}
           className="bg-blue-500 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full mb-2"
         >
-          {editId ? "Update User" : "Add Userss"}
+          {editId ? "Update User" : "Add User"}
         </button>
       </div>
 
