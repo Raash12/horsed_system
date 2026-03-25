@@ -1,105 +1,61 @@
-import { useState, useEffect } from "react"
-import { fetchUsers, addUser, updateUser, deleteUser } from "./config/supabaseClient"
+// src/App.jsx
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function App() {
-  const [users, setUsers] = useState([])
-  const [name, setName] = useState("")
-  const [editId, setEditId] = useState(null) // track editing user
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
-  const loadUsers = async () => {
-    try {
-      const data = await fetchUsers()
-      setUsers(data)
-    } catch (err) {
-      console.log(err.message)
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (email === "admin@example.com" && password === "123456") {
+      setMessage("Login successful 🎉");
+    } else {
+      setMessage("Invalid credentials ❌");
     }
-  }
-
-  const handleAddOrUpdateUser = async () => {
-    try {
-      if (editId) {
-        // Update existing user
-        await updateUser(editId, name)
-        setEditId(null)
-      } else {
-        // Add new user
-        await addUser(name)
-      }
-      setName("")
-      loadUsers()
-    } catch (err) {
-      alert(err.message)
-    }
-  }
-
-  const handleEdit = (user) => {
-    setName(user.name)
-    setEditId(user.id)
-  }
-
-  const handleDelete = async (id) => {
-    if (confirm("Are you sure you want to delete this user?")) {
-      try {
-        await deleteUser(id)
-        loadUsers()
-      } catch (err) {
-        alert(err.message)
-      }
-    }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-      <div className="bg-white p-6 rounded-2xl shadow-xl w-80 text-center mb-6">
-        <h1 className="text-3xl font-bold text-blue-600 mb-4">Supabase CRUD 🚀</h1>
-
-        <input
-          className="border p-2 w-full mb-2 rounded"
-          placeholder="Enter name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button
-          onClick={handleAddOrUpdateUser}
-          className="bg-blue-500 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full mb-2"
-        >
-          {editId ? "Update User" : "Add User"}
-        </button>
-      </div>
-
-      <div className="bg-white p-4 rounded-2xl shadow w-80 text-center">
-        <h2 className="font-bold text-xl mb-2">Users:</h2>
-        {users.length === 0 ? (
-          <p className="text-gray-500">No users yet</p>
-        ) : (
-          users.map((user) => (
-            <div
-              key={user.id}
-              className="flex justify-between items-center border-b py-2 px-2"
-            >
-              <span>{user.name}</span>
-              <div className="space-x-2">
-                <button
-                  onClick={() => handleEdit(user)}
-                  className="bg-yellow-400 hover:bg-yellow-600 text-white px-2 py-1 rounded"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(user.id)}
-                  className="bg-red-500 hover:bg-red-700 text-white px-2 py-1 rounded"
-                >
-                  Delete
-                </button>
-              </div>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <Card className="w-full max-w-sm shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-center text-2xl">Login</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="mt-1"
+              />
             </div>
-          ))
-        )}
-      </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="mt-1"
+              />
+            </div>
+            <Button type="submit" className="w-full mt-2">Login</Button>
+            {message && <p className="text-center text-red-500 mt-2">{message}</p>}
+          </form>
+        </CardContent>
+      </Card>
     </div>
-  )
+  );
 }
