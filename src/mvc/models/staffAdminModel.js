@@ -1,11 +1,8 @@
 import { supabase } from "@/config/supabaseClient";
-import { createEphemeralSupabaseClient } from "@/config/supabaseEphemeralClient";
 
 /**
- * Creates an auth user (email+password) without changing current UI session,
- * then creates/updates a matching row in `profiles` with role + branch_id.
- *
- * Requires RLS to allow super_admin to upsert into `profiles`.
+ * Creates staff via backend Admin API.
+ * This avoids email rate-limit and bypasses RLS safely (server uses service role).
  */
 export async function createStaffUser({ email, password, role, branchId }) {
   const cleanEmail = (email ?? "").trim().toLowerCase();
@@ -25,39 +22,36 @@ export async function createStaffUser({ email, password, role, branchId }) {
     throw new Error("Branch is required.");
   }
 
-  const ephemeral = createEphemeralSupabaseClient();
-  const { data: signUpData, error: signUpError } = await ephemeral.auth.signUp({
-    email: cleanEmail,
-    password: cleanPassword,
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const token = sessionData?.session?.access_token;
+  if (!token) throw new Error("Not authenticated.");
+
+  const resp = await fetch("/api/admin/create-staff", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      email: cleanEmail,
+      password: cleanPassword,
+      role,
+      branchId,
+    }),
   });
 
-  if (signUpError) throw signUpError;
-
-  const userId = signUpData?.user?.id;
-  if (!userId) {
+  if (resp.status === 502) {
     throw new Error(
-      "User was created but no user id returned. Check Supabase Auth settings (email confirmations).",
+      "Admin API not reachable (502). Start it with `npm run dev:server` and ensure it listens on port 8787.",
     );
   }
 
-  const { data: profileData, error: profileError } = await supabase
-    .from("profiles")
-    .upsert(
-      {
-        id: userId,
-        role,
-        branch_id: branchId,
-      },
-      { onConflict: "id" },
-    )
-    .select("id, role, branch_id")
-    .single();
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(payload?.error || "Failed to create staff user.");
+  }
 
-  if (profileError) throw profileError;
-
-  return {
-    userId,
-    profile: profileData,
-  };
+  return payload;
 }
 
