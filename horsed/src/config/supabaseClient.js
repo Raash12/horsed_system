@@ -1,10 +1,21 @@
-// // src/supabaseClient.js
-// import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@supabase/supabase-js";
 
-// const supabaseUrl = "https://wngfvjsteetbfkssmfue.supabase.co" // your project URL
-// const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InduZ2Z2anN0ZWV0YmZrc3NtZnVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNDM5NzEsImV4cCI6MjA4OTgxOTk3MX0.HgFTqSrtp3DjnhqeyY8X7kFl-pJG75hX3EGhgUP0mKc" // your anon key
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    "Missing Supabase env vars. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to your .env file.",
+  );
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 
 
