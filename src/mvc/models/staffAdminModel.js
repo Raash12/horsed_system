@@ -55,3 +55,39 @@ export async function createStaffUser({ email, password, role, branchId }) {
   return payload;
 }
 
+export async function listDoctors({ branchId } = {}) {
+  return listStaff({ role: "doctor", branchId });
+}
+
+export async function listStaff({ role, branchId } = {}) {
+  if (role && !["doctor", "reception"].includes(role)) {
+    throw new Error("Role must be doctor or reception.");
+  }
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+
+  const token = sessionData?.session?.access_token;
+  if (!token) throw new Error("Not authenticated.");
+
+  const q = new URLSearchParams();
+  if (role) q.set("role", role);
+  if (branchId) q.set("branchId", branchId);
+
+  const query = q.toString();
+  const url = query ? `/api/admin/list-staff?${query}` : `/api/admin/list-staff`;
+  const resp = await fetch(url, {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(payload?.error || "Failed to load staff.");
+  }
+
+  return payload?.data ?? [];
+}
+

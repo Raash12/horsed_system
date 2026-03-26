@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 
 import { createBranch, listBranches } from "@/mvc/models/branchModel";
-import { createStaffUser } from "@/mvc/models/staffAdminModel";
+import { createStaffUser, listStaff } from "@/mvc/models/staffAdminModel";
 
 export default function SuperAdminHome() {
   const { user, profile, signOut, isLoading } = useAuth();
@@ -45,6 +45,10 @@ export default function SuperAdminHome() {
   const [staffBranchId, setStaffBranchId] = useState("");
   const [creatingStaff, setCreatingStaff] = useState(false);
   const [staffMessage, setStaffMessage] = useState("");
+
+  const [staff, setStaff] = useState([]);
+  const [staffLoading, setStaffLoading] = useState(true);
+  const [staffError, setStaffError] = useState("");
 
   const branchOptions = useMemo(() => {
     return branches.map((b) => ({ id: b.id, name: b.name }));
@@ -70,6 +74,25 @@ export default function SuperAdminHome() {
     refreshBranches();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function refreshStaff(nextBranchId) {
+    setStaffLoading(true);
+    setStaffError("");
+    try {
+      const rows = await listStaff({ branchId: nextBranchId ?? staffBranchId });
+      setStaff(rows ?? []);
+    } catch (e) {
+      setStaffError(e?.message || "Failed to load staff.");
+    } finally {
+      setStaffLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!staffBranchId) return;
+    refreshStaff(staffBranchId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffBranchId]);
 
   async function handleCreateBranch(e) {
     e.preventDefault();
@@ -179,6 +202,54 @@ export default function SuperAdminHome() {
                     <TableRow>
                       <TableCell colSpan={2} className="text-muted-foreground">
                         No branches yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Staff</CardTitle>
+            <CardDescription>Doctors and reception for the selected branch.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {staffError && <div className="text-sm text-destructive">{staffError}</div>}
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead className="w-[170px]">User ID</TableHead>
+                    <TableHead className="w-[160px]">Role</TableHead>
+                    <TableHead>Branch</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {staffLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-muted-foreground">
+                        Loading...
+                      </TableCell>
+                    </TableRow>
+                  ) : staff.length ? (
+                    staff.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell>{d.email ?? "-"}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {d.id}
+                        </TableCell>
+                        <TableCell>{d.role ?? "-"}</TableCell>
+                        <TableCell>{d.branch_name ?? d.branch_id ?? "-"}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-muted-foreground">
+                        No staff found.
                       </TableCell>
                     </TableRow>
                   )}
