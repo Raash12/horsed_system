@@ -1,9 +1,20 @@
 import { supabase } from "@/config/supabaseClient";
 
-export async function signInWithEmailPassword(email, password) {
+/**
+ * @param {{ captchaToken?: string }} [options] Required when Supabase Auth has CAPTCHA / bot protection enabled (e.g. Cloudflare Turnstile).
+ */
+export async function signInWithEmailPassword(email, password, options = {}) {
+  const normalizedEmail = String(email ?? "").trim().toLowerCase();
+  const pwd = String(password ?? "");
+  if (!normalizedEmail || !pwd) {
+    throw new Error("Email and password are required.");
+  }
+
+  const { captchaToken } = options;
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
+    email: normalizedEmail,
+    password: pwd,
+    ...(captchaToken ? { options: { captchaToken } } : {}),
   });
 
   if (error) throw error;

@@ -2,9 +2,14 @@ import { supabase } from "@/config/supabaseClient";
 
 /**
  * Creates staff via backend Admin API.
- * This avoids email rate-limit and bypasses RLS safely (server uses service role).
  */
-export async function createStaffUser({ email, password, role, branchId }) {
+export async function createStaffUser({
+  email,
+  password,
+  role,
+  branchId,
+  full_name, // ✅ FIX: added
+}) {
   const cleanEmail = (email ?? "").trim().toLowerCase();
   const cleanPassword = password ?? "";
 
@@ -22,8 +27,14 @@ export async function createStaffUser({ email, password, role, branchId }) {
     throw new Error("Branch is required.");
   }
 
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (!full_name) {
+    throw new Error("Full name is required."); // ✅ optional validation
+  }
+
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
   if (sessionError) throw sessionError;
+
   const token = sessionData?.session?.access_token;
   if (!token) throw new Error("Not authenticated.");
 
@@ -38,12 +49,13 @@ export async function createStaffUser({ email, password, role, branchId }) {
       password: cleanPassword,
       role,
       branchId,
+      full_name, // ✅ FIX: send to backend
     }),
   });
 
   if (resp.status === 502) {
     throw new Error(
-      "Admin API not reachable (502). Start it with `npm run dev:server` and ensure it listens on port 8787.",
+      "Admin API not reachable (502). Start it with `npm run dev:server`.",
     );
   }
 
@@ -55,16 +67,16 @@ export async function createStaffUser({ email, password, role, branchId }) {
   return payload;
 }
 
-export async function listDoctors({ branchId } = {}) {
-  return listStaff({ role: "doctor", branchId });
-}
-
+/**
+ * List staff
+ */
 export async function listStaff({ role, branchId } = {}) {
   if (role && !["doctor", "reception"].includes(role)) {
     throw new Error("Role must be doctor or reception.");
   }
 
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
   if (sessionError) throw sessionError;
 
   const token = sessionData?.session?.access_token;
@@ -74,8 +86,8 @@ export async function listStaff({ role, branchId } = {}) {
   if (role) q.set("role", role);
   if (branchId) q.set("branchId", branchId);
 
-  const query = q.toString();
-  const url = query ? `/api/admin/list-staff?${query}` : `/api/admin/list-staff`;
+  const url = `/api/admin/list-staff?${q.toString()}`;
+
   const resp = await fetch(url, {
     method: "GET",
     headers: {
@@ -90,4 +102,3 @@ export async function listStaff({ role, branchId } = {}) {
 
   return payload?.data ?? [];
 }
-

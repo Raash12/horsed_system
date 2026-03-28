@@ -80,9 +80,9 @@ export function AuthProvider({ children }) {
       profile,
       authError,
       isLoading,
-      signIn: async (email, password) => {
+      signIn: async (email, password, signInOptions) => {
         setAuthError(null);
-        await signInWithEmailPassword(email, password);
+        await signInWithEmailPassword(email, password, signInOptions ?? {});
       },
       signOut: async () => {
         await signOut();

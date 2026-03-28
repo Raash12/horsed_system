@@ -125,10 +125,13 @@ async function requireSuperAdmin(req) {
     .from("profiles")
     .select("role")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (profileError) {
     return { ok: false, status: 403, error: profileError.message || "Profile not found." };
+  }
+  if (!profile) {
+    return { ok: false, status: 403, error: "Profile not found." };
   }
 
   if (profile?.role !== "super_admin") {

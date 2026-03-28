@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/mvc/controllers/auth/AuthProvider";
+
 import {
   Card,
   CardContent,
@@ -8,8 +9,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
 import {
   Table,
   TableBody,
@@ -18,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
 import {
   Select,
   SelectContent,
@@ -32,13 +36,15 @@ import { createStaffUser, listStaff } from "@/mvc/models/staffAdminModel";
 export default function SuperAdminHome() {
   const { user, profile, signOut, isLoading } = useAuth();
 
+  // BRANCH
   const [branches, setBranches] = useState([]);
   const [branchesLoading, setBranchesLoading] = useState(true);
   const [branchesError, setBranchesError] = useState("");
-
   const [newBranchName, setNewBranchName] = useState("");
   const [creatingBranch, setCreatingBranch] = useState(false);
 
+  // STAFF CREATE
+  const [staffFullName, setStaffFullName] = useState("");
   const [staffEmail, setStaffEmail] = useState("");
   const [staffPassword, setStaffPassword] = useState("");
   const [staffRole, setStaffRole] = useState("doctor");
@@ -46,6 +52,7 @@ export default function SuperAdminHome() {
   const [creatingStaff, setCreatingStaff] = useState(false);
   const [staffMessage, setStaffMessage] = useState("");
 
+  // STAFF LIST
   const [staff, setStaff] = useState([]);
   const [staffLoading, setStaffLoading] = useState(true);
   const [staffError, setStaffError] = useState("");
@@ -54,12 +61,14 @@ export default function SuperAdminHome() {
     return branches.map((b) => ({ id: b.id, name: b.name }));
   }, [branches]);
 
+  // ================= BRANCH =================
   async function refreshBranches() {
     setBranchesLoading(true);
     setBranchesError("");
     try {
       const rows = await listBranches();
       setBranches(rows);
+
       if (!staffBranchId && rows?.[0]?.id) {
         setStaffBranchId(rows[0].id);
       }
@@ -72,15 +81,29 @@ export default function SuperAdminHome() {
 
   useEffect(() => {
     refreshBranches();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function refreshStaff(nextBranchId) {
+  async function handleCreateBranch(e) {
+    e.preventDefault();
+    setCreatingBranch(true);
+    try {
+      await createBranch({ name: newBranchName });
+      setNewBranchName("");
+      refreshBranches();
+    } catch (err) {
+      setBranchesError(err?.message);
+    } finally {
+      setCreatingBranch(false);
+    }
+  }
+
+  // ================= STAFF =================
+  async function refreshStaff(branchId) {
     setStaffLoading(true);
     setStaffError("");
     try {
-      const rows = await listStaff({ branchId: nextBranchId ?? staffBranchId });
-      setStaff(rows ?? []);
+      const rows = await listStaff({ branchId });
+      setStaff(rows || []);
     } catch (e) {
       setStaffError(e?.message || "Failed to load staff.");
     } finally {
@@ -89,271 +112,196 @@ export default function SuperAdminHome() {
   }
 
   useEffect(() => {
-    if (!staffBranchId) return;
-    refreshStaff(staffBranchId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staffBranchId]);
-
-  async function handleCreateBranch(e) {
-    e.preventDefault();
-    setCreatingBranch(true);
-    setBranchesError("");
-    try {
-      await createBranch({ name: newBranchName });
-      setNewBranchName("");
-      await refreshBranches();
-    } catch (err) {
-      setBranchesError(err?.message || "Failed to create branch.");
-    } finally {
-      setCreatingBranch(false);
+    if (staffBranchId) {
+      refreshStaff(staffBranchId);
     }
-  }
+  }, [staffBranchId]);
 
   async function handleCreateStaff(e) {
     e.preventDefault();
     setCreatingStaff(true);
     setStaffMessage("");
+
     try {
-      const res = await createStaffUser({
+      await createStaffUser({
+        full_name: staffFullName, // ✅ NEW
         email: staffEmail,
         password: staffPassword,
         role: staffRole,
         branchId: staffBranchId,
       });
+
+      setStaffFullName("");
+      setStaffEmail("");
       setStaffPassword("");
-      setStaffMessage(`Created ${staffRole} (${staffEmail})`);
-      return res;
+
+      setStaffMessage("Staff created successfully ✅");
+
+      refreshStaff(staffBranchId);
     } catch (err) {
-      setStaffMessage(err?.message || "Failed to create staff user.");
+      setStaffMessage(err?.message || "Failed to create staff.");
     } finally {
       setCreatingStaff(false);
     }
   }
 
+  // ================= UI =================
   return (
     <div className="p-6">
-      <div className="flex items-start justify-between gap-4">
+      {/* HEADER */}
+      <div className="flex justify-between">
         <div>
           <h1 className="text-2xl font-bold">Super Admin</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Signed in as {user?.email || "unknown"}
+          <p className="text-sm text-muted-foreground">
+            {user?.email}
           </p>
-          {profile?.branch_id && (
-            <p className="mt-1 text-sm text-muted-foreground">Branch: {profile.branch_id}</p>
-          )}
         </div>
 
-        <Button variant="outline" onClick={signOut} disabled={isLoading}>
+        <Button onClick={signOut} variant="outline">
           Logout
         </Button>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <div className="grid md:grid-cols-2 gap-4 mt-6">
+
+        {/* ================= BRANCH ================= */}
         <Card>
           <CardHeader>
             <CardTitle>Branches</CardTitle>
-            <CardDescription>Create and view branches.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <form onSubmit={handleCreateBranch} className="space-y-2">
-              <Label htmlFor="branchName">Branch name</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="branchName"
-                  value={newBranchName}
-                  onChange={(e) => setNewBranchName(e.target.value)}
-                  placeholder="e.g. Muqdisho - Main"
-                />
-                <Button type="submit" disabled={creatingBranch || branchesLoading}>
-                  {creatingBranch ? "Creating..." : "Create"}
-                </Button>
-              </div>
+
+          <CardContent>
+            <form onSubmit={handleCreateBranch} className="flex gap-2 mb-4">
+              <Input
+                value={newBranchName}
+                onChange={(e) => setNewBranchName(e.target.value)}
+                placeholder="Branch name"
+              />
+              <Button type="submit">
+                {creatingBranch ? "..." : "Create"}
+              </Button>
             </form>
 
-            {branchesError && (
-              <div className="text-sm text-destructive">{branchesError}</div>
-            )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>ID</TableHead>
+                </TableRow>
+              </TableHeader>
 
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="w-[220px]">ID</TableHead>
+              <TableBody>
+                {branches.map((b) => (
+                  <TableRow key={b.id}>
+                    <TableCell>{b.name}</TableCell>
+                    <TableCell>{b.id}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {branchesLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-muted-foreground">
-                        Loading...
-                      </TableCell>
-                    </TableRow>
-                  ) : branches.length ? (
-                    branches.map((b) => (
-                      <TableRow key={b.id}>
-                        <TableCell>{b.name}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {b.id}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-muted-foreground">
-                        No branches yet.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
 
+        {/* ================= STAFF LIST ================= */}
         <Card>
           <CardHeader>
             <CardTitle>Staff</CardTitle>
-            <CardDescription>Doctors and reception for the selected branch.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {staffError && <div className="text-sm text-destructive">{staffError}</div>}
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead className="w-[170px]">User ID</TableHead>
-                    <TableHead className="w-[160px]">Role</TableHead>
-                    <TableHead>Branch</TableHead>
+
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Full Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Branch</TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {staff.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell>{s.full_name || "-"}</TableCell>
+                    <TableCell>{s.email}</TableCell>
+                    <TableCell>{s.role}</TableCell>
+                    <TableCell>
+                      {s.branch_name || s.branch_id}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {staffLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-muted-foreground">
-                        Loading...
-                      </TableCell>
-                    </TableRow>
-                  ) : staff.length ? (
-                    staff.map((d) => (
-                      <TableRow key={d.id}>
-                        <TableCell>{d.email ?? "-"}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {d.id}
-                        </TableCell>
-                        <TableCell>{d.role ?? "-"}</TableCell>
-                        <TableCell>{d.branch_name ?? d.branch_id ?? "-"}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-muted-foreground">
-                        No staff found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
 
+        {/* ================= CREATE STAFF ================= */}
         <Card>
           <CardHeader>
-            <CardTitle>Create staff</CardTitle>
-            <CardDescription>Create doctor/reception and assign a branch.</CardDescription>
+            <CardTitle>Create Staff</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+
+          <CardContent>
             <form onSubmit={handleCreateStaff} className="space-y-3">
-              <div className="grid gap-1.5">
-                <Label htmlFor="staffEmail">Email</Label>
-                <Input
-                  id="staffEmail"
-                  type="email"
-                  value={staffEmail}
-                  onChange={(e) => setStaffEmail(e.target.value)}
-                  placeholder="staff@example.com"
-                  required
-                />
-              </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="staffPassword">Password</Label>
-                <Input
-                  id="staffPassword"
-                  type="password"
-                  value={staffPassword}
-                  onChange={(e) => setStaffPassword(e.target.value)}
-                  placeholder="min 6 characters"
-                  required
-                />
-              </div>
+              <Input
+                placeholder="Full Name"
+                value={staffFullName}
+                onChange={(e) => setStaffFullName(e.target.value)}
+                required
+              />
 
-              <div className="grid gap-1.5">
-                <Label>Role</Label>
-                <Select value={staffRole} onValueChange={setStaffRole}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="doctor">Doctor</SelectItem>
-                    <SelectItem value="reception">Reception</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Input
+                type="email"
+                placeholder="Email"
+                value={staffEmail}
+                onChange={(e) => setStaffEmail(e.target.value)}
+                required
+              />
 
-              <div className="grid gap-1.5">
-                <Label>Branch</Label>
-                <Select value={staffBranchId} onValueChange={setStaffBranchId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branchOptions.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!branchOptions.length && (
-                  <div className="text-xs text-muted-foreground">
-                    Create a branch first.
-                  </div>
-                )}
-              </div>
+              <Input
+                type="password"
+                placeholder="Password"
+                value={staffPassword}
+                onChange={(e) => setStaffPassword(e.target.value)}
+                required
+              />
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={creatingStaff || !branchOptions.length}
-              >
-                {creatingStaff ? "Creating..." : "Create staff account"}
+              <Select value={staffRole} onValueChange={setStaffRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="doctor">Doctor</SelectItem>
+                  <SelectItem value="reception">Reception</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={staffBranchId} onValueChange={setStaffBranchId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branchOptions.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button type="submit" className="w-full">
+                {creatingStaff ? "Creating..." : "Create Staff"}
               </Button>
             </form>
 
             {staffMessage && (
-              <div
-                className={[
-                  "text-sm",
-                  staffMessage.toLowerCase().includes("failed") ||
-                  staffMessage.toLowerCase().includes("error")
-                    ? "text-destructive"
-                    : "text-foreground",
-                ].join(" ")}
-              >
-                {staffMessage}
-              </div>
+              <p className="text-sm mt-2">{staffMessage}</p>
             )}
-
-            <div className="text-xs text-muted-foreground">
-              Signed in as {user?.email || "unknown"} ({profile?.role || "unknown"}).
-            </div>
           </CardContent>
         </Card>
+
       </div>
     </div>
   );
 }
-

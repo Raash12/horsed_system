@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,17 @@ import { Label } from "@/components/ui/label";
 
 import { useAuth } from "@/mvc/controllers/auth/AuthProvider";
 
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+
+function loginErrorMessage(err) {
+  const msg = err?.message || "";
+  if (!msg) return "Login failed. Check your credentials.";
+  if (/captcha|captcha_token|verification required/i.test(msg)) {
+    return `${msg} If you enabled Bot Protection in Supabase, add VITE_TURNSTILE_SITE_KEY (Cloudflare Turnstile site key) to .env and restart the dev server.`;
+  }
+  return msg;
+}
+
 export default function LoginView() {
   const navigate = useNavigate();
   const { signIn, isLoading, authError } = useAuth();
@@ -15,17 +27,29 @@ export default function LoginView() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const turnstileRef = useRef(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setMessage("");
 
+    if (turnstileSiteKey && !captchaToken) {
+      setMessage("Please complete the security check above.");
+      return;
+    }
+
     try {
-      await signIn(email, password);
+      await signIn(
+        email,
+        password,
+        turnstileSiteKey && captchaToken ? { captchaToken } : undefined,
+      );
       navigate("/", { replace: true });
     } catch (err) {
-      const msg = err?.message || "Login failed. Check your credentials.";
-      setMessage(msg);
+      turnstileRef.current?.reset();
+      setCaptchaToken(null);
+      setMessage(loginErrorMessage(err));
     }
   }
 
@@ -61,6 +85,17 @@ export default function LoginView() {
                 className="mt-1"
               />
             </div>
+
+            {turnstileSiteKey ? (
+              <div className="flex justify-center pt-1">
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={turnstileSiteKey}
+                  onSuccess={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken(null)}
+                />
+              </div>
+            ) : null}
 
             <Button type="submit" className="w-full mt-2" disabled={isLoading}>
               {isLoading ? "Signing in..." : "Login"}
